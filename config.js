@@ -45,7 +45,17 @@ config = {
     // Configure your URL and mail settings here
     production: {
         url: 'http://blog.10hacks.com',
-        mail: {},
+        mail: {
+            transport: 'sendgrid',
+            host: 'smtp.sendgrid.net',
+            options: {
+                service: 'Sendgrid',
+                auth: {
+                    user: process.env.SENDMAIL_USERNAME,
+                    pass: process.env.SENDMAIL_PASSWORD
+                }
+            }
+        },
         database: {
             client: 'postgres',
             connection: {
