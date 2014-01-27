@@ -18,7 +18,7 @@ var crypto      = require('crypto'),
     middleware  = require('./middleware'),
     models      = require('./models'),
     permissions = require('./permissions'),
-    plugins     = require('./plugins'),
+    apps        = require('./apps'),
     routes      = require('./routes'),
     packageInfo = require('../../package.json'),
 
@@ -70,8 +70,45 @@ function initDbHashAndFirstRun() {
     });
 }
 
+// Checks for the existence of the "built" javascript files from grunt concat.
+// Returns a promise that will be resolved if all files exist or rejected if 
+// any are missing.
+function builtFilesExist() {
+    var deferreds = [],
+        location = config.paths().builtScriptPath,
+
+        fileNames = process.env.NODE_ENV === 'production' ?
+                helpers.scriptFiles.production : helpers.scriptFiles.development;
+
+    function checkExist(fileName) {
+        var deferred = when.defer(),
+            errorMessage = "Javascript files have not been built.",
+            errorHelp = "\nPlease read the getting started instructions at:" +
+                        "\nhttps://github.com/TryGhost/Ghost#getting-started-guide-for-developers";
+
+        fs.exists(fileName, function (exists) {
+            if (exists) {
+                deferred.resolve(true);
+            } else {
+                var err = new Error(errorMessage);
+
+                err.help = errorHelp;
+                deferred.reject(err);
+            }
+        });
+
+        return deferred.promise;
+    }
+
+    fileNames.forEach(function (fileName) {
+        deferreds.push(checkExist(location + fileName));
+    });
+
+    return when.all(deferreds);
+}
+
 // Sets up the express server instance.
-// Instantiates the ghost singleton, helpers, routes, middleware, and plugins.
+// Instantiates the ghost singleton, helpers, routes, middleware, and apps.
 // Finally it starts the http server.
 function setup(server) {
 
@@ -101,6 +138,9 @@ function setup(server) {
             // Initialize the permissions actions and objects
             permissions.init()
         );
+    }).then(function () {
+        // Make sure javascript files have been built via grunt concat
+        return builtFilesExist();
     }).then(function () {
         // Initialize mail
         return mailer.init();
@@ -200,8 +240,8 @@ function setup(server) {
 
         }
 
-        // Initialize plugins then start the server
-        plugins.init().then(function () {
+        // Initialize apps then start the server
+        apps.init().then(function () {
 
             // ## Start Ghost App
             if (getSocket()) {
@@ -225,7 +265,7 @@ function setup(server) {
 
         });
     }, function (err) {
-        errors.logErrorAndExit(err);
+        errors.logErrorAndExit(err, err.context, err.help);
     });
 }
 
