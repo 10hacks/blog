@@ -45,7 +45,7 @@ projectFilesBackup
 /content/data/*
 /content/apps/**/*
 /content/themes/**/*
-/content/images/**/*
+# /content/images/**/*
 !/content/themes/casper/**
 !/README.md
 
