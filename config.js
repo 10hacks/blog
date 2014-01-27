@@ -57,7 +57,7 @@ config = {
             }
         },
         database: {
-            client: 'postgres',
+            client: 'pg',
             connection: {
                 host: process.env.POSTGRES_HOST,
                 user: process.env.POSTGRES_USER,
