@@ -1,6 +1,4 @@
-var User,
-    Users,
-    _              = require('underscore'),
+var _              = require('lodash'),
     uuid           = require('node-uuid'),
     when           = require('when'),
     errors         = require('../errorHandling'),
@@ -11,7 +9,11 @@ var User,
     Role           = require('./role').Role,
     Permission     = require('./permission').Permission,
     http           = require('http'),
-    crypto         = require('crypto');
+    crypto         = require('crypto'),
+
+    tokenSecurity  = {},
+    User,
+    Users;
 
 function validatePasswordLength(password) {
     try {
@@ -35,12 +37,6 @@ User = ghostBookshelf.Model.extend({
 
     tableName: 'users',
 
-    permittedAttributes: [
-        'id', 'uuid', 'name', 'slug', 'password', 'email', 'image', 'cover', 'bio', 'website', 'location',
-        'accessibility', 'status', 'language', 'meta_title', 'meta_description', 'last_login', 'created_at',
-        'created_by', 'updated_at', 'updated_by'
-    ],
-
     validate: function () {
         ghostBookshelf.validator.check(this.get('email'), "Please enter a valid email address. That one looks a bit dodgy.").isEmail();
         ghostBookshelf.validator.check(this.get('bio'), "We're not writing a novel here! I'm afraid your bio has to stay under 200 characters.").len(0, 200);
@@ -51,10 +47,16 @@ User = ghostBookshelf.Model.extend({
         return true;
     },
 
-    creating: function () {
+    saving: function () {
         var self = this;
+        // disabling sanitization until we can implement a better version
+        // this.set('name', this.sanitize('name'));
+        // this.set('email', this.sanitize('email'));
+        // this.set('location', this.sanitize('location'));
+        // this.set('website', this.sanitize('website'));
+        // this.set('bio', this.sanitize('bio'));
 
-        ghostBookshelf.Model.prototype.creating.call(this);
+        ghostBookshelf.Model.prototype.saving.apply(this, arguments);
 
         if (!this.get('slug')) {
             // Generating a slug requires a db call to look for conflicting slugs
@@ -63,18 +65,7 @@ User = ghostBookshelf.Model.extend({
                     self.set({slug: slug});
                 });
         }
-    },
 
-    saving: function () {
-
-        // disabling sanitization until we can implement a better version
-        // this.set('name', this.sanitize('name'));
-        // this.set('email', this.sanitize('email'));
-        // this.set('location', this.sanitize('location'));
-        // this.set('website', this.sanitize('website'));
-        // this.set('bio', this.sanitize('bio'));
-
-        return ghostBookshelf.Model.prototype.saving.apply(this, arguments);
     },
 
     posts: function () {
@@ -268,6 +259,7 @@ User = ghostBookshelf.Model.extend({
     },
 
     validateToken: function (token, dbHash) {
+        /*jslint bitwise:true*/
         // TODO: Is there a chance the use of ascii here will cause problems if oldPassword has weird characters?
         var tokenText = new Buffer(token, 'base64').toString('ascii'),
             parts,
@@ -288,17 +280,36 @@ User = ghostBookshelf.Model.extend({
             return when.reject(new Error("Invalid token expiration"));
         }
 
-        // This is easy to fake, but still check anyway.
+        // Check if token is expired to prevent replay attacks
         if (expires < Date.now()) {
             return when.reject(new Error("Expired token"));
         }
 
+        // to prevent brute force attempts to reset the password the combination of email+expires is only allowed for 10 attempts
+        if (tokenSecurity[email + '+' + expires] && tokenSecurity[email + '+' + expires].count >= 10) {
+            return when.reject(new Error("Token locked"));
+        }
+
         return this.generateResetToken(email, expires, dbHash).then(function (generatedToken) {
-            // Check for matching tokens
-            if (token === generatedToken) {
+            // Check for matching tokens with timing independent comparison
+            var diff = 0,
+                i;
+
+            // check if the token lenght is correct
+            if (token.length !== generatedToken.length) {
+                diff = 1;
+            }
+
+            for (i = token.length - 1; i >= 0; i = i - 1) {
+                diff |= token.charCodeAt(i) ^ generatedToken.charCodeAt(i);
+            }
+
+            if (diff === 0) {
                 return when.resolve(email);
             }
 
+            // increase the count for email+expires for each failed attempt
+            tokenSecurity[email + '+' + expires] = {count: tokenSecurity[email + '+' + expires] ? tokenSecurity[email + '+' + expires].count + 1 : 1};
             return when.reject(new Error("Invalid token"));
         });
     },

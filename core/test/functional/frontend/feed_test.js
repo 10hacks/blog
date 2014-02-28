@@ -10,7 +10,7 @@ CasperTest.begin('Ensure that RSS is available', 11, function suite(test) {
             siteDescription = '<description><![CDATA[Just a blogging platform.]]></description>',
             siteUrl = '<link>http://127.0.0.1:2369/</link>',
             postTitle = '<![CDATA[Welcome to Ghost]]>',
-            postStart = '<description><![CDATA[<p>You\'re live!',
+            postStart = '<description><![CDATA[<p>You’re live!',
             postEnd = 'you think :)</p>]]></description>',
             postLink = '<link>http://127.0.0.1:2369/welcome-to-ghost/</link>',
             postCreator = '<dc:creator><![CDATA[Test User]]>';
@@ -26,6 +26,19 @@ CasperTest.begin('Ensure that RSS is available', 11, function suite(test) {
         test.assert(content.indexOf(postLink) >= 0, 'Feed should have link to the welcome post.');
         test.assert(content.indexOf(postCreator) >= 0, 'Welcome post should have Test User as the creator.');
         test.assert(content.indexOf('</rss>') >= 0, 'Feed should contain </rss>');
+    });
+}, false);
+
+CasperTest.begin('Ensure that author element is not included. Only dc:creator', 3, function suite(test) {
+    CasperTest.Routines.togglePermalinks.run('off');
+    casper.thenOpen(url + 'rss/', function (response) {
+        var content = this.getPageContent(),
+            author = '<author>',
+            postCreator = '<dc:creator><![CDATA[Test User]]>';
+
+        test.assertEqual(response.status, 200, 'Response status should be 200.');
+        test.assert(content.indexOf(author) < 0, 'Author element should not be included');
+        test.assert(content.indexOf(postCreator) >= 0, 'Welcome post should have Test User as the creator.');
     });
 }, false);
 

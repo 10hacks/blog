@@ -7,7 +7,7 @@ var crypto      = require('crypto'),
     path        = require('path'),
     Polyglot    = require('node-polyglot'),
     semver      = require('semver'),
-    _           = require('underscore'),
+    _           = require('lodash'),
     when        = require('when'),
 
     api         = require('./api'),
@@ -71,11 +71,11 @@ function initDbHashAndFirstRun() {
 }
 
 // Checks for the existence of the "built" javascript files from grunt concat.
-// Returns a promise that will be resolved if all files exist or rejected if 
+// Returns a promise that will be resolved if all files exist or rejected if
 // any are missing.
 function builtFilesExist() {
     var deferreds = [],
-        location = config.paths().builtScriptPath,
+        location = config().paths.builtScriptPath,
 
         fileNames = process.env.NODE_ENV === 'production' ?
                 helpers.scriptFiles.production : helpers.scriptFiles.development;
@@ -158,7 +158,7 @@ function setup(server) {
         server.set('view engine', 'hbs');
 
         // Create a hbs instance for admin and init view engine
-        server.set('admin view engine', adminHbs.express3({partialsDir: config.paths().adminViews + 'partials'}));
+        server.set('admin view engine', adminHbs.express3({partialsDir: config().paths.adminViews + 'partials'}));
 
         // Load helpers
         helpers.loadCoreHelpers(adminHbs, assetHash);
@@ -262,7 +262,12 @@ function setup(server) {
                     startGhost
                 );
             }
-
+            _.each(config().paths.availableThemes._messages.errors, function (error) {
+                errors.logError(error.message, error.context);
+            });
+            _.each(config().paths.availableThemes._messages.warns, function (warn) {
+                errors.logWarn(warn.message, warn.context);
+            });
         });
     }, function (err) {
         errors.logErrorAndExit(err, err.context, err.help);

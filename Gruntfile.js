@@ -6,50 +6,33 @@ var path           = require('path'),
     when           = require('when'),
     semver         = require('semver'),
     fs             = require('fs'),
-    _              = require('underscore'),
+    _              = require('lodash'),
     spawn          = require('child_process').spawn,
     buildDirectory = path.resolve(process.cwd(), '.build'),
     distDirectory  = path.resolve(process.cwd(), '.dist'),
-    config         = require('./core/server/config'),
+    bootstrap      = require('./core/bootstrap'),
 
 
     // ## Build File Patterns
     // a list of files and paterns to process and exclude when running builds & releases
-    buildGlob = [
-        '**',
-        '!docs/**',
-        '!_site/**',
-        '!content/images/**',
-        'content/images/README.md',
-        '!content/themes/**',
-        'content/themes/casper/**',
-        '!content/apps/**',
-        'content/apps/README.md',
-        '!node_modules/**',
-        '!core/test/**',
-        '!core/client/assets/sass/**',
-        '!core/server/data/export/exported*',
-        '!**/*.db*',
-        '!*.db*',
-        '!.sass*',
-        '!.af*',
-        '!.git*',
-        '!.groc*',
-        '!*.iml',
-        '!config.js',
-        '!CONTRIBUTING.md',
-        '!SECURITY.md',
-        '!.travis.yml',
-        '!Gemfile*',
-        '!*.html'
-    ],
+    // It is taken from the .npmignore file and all patterns are inverted as the .npmignore
+    // file defines what to ignore, whereas we want to define what to include.
+    buildGlob = (function () {
+        /*jslint stupid:true */
+        return fs.readFileSync('.npmignore', {encoding: 'utf8'}).split('\n').map(function (pattern) {
+            if (pattern[0] === '!') {
+                return pattern.substr(1);
+            }
+            return '!' + pattern;
+        });
+    }()),
 
     // ## Grunt configuration
 
     configureGrunt = function (grunt) {
 
         // load all grunt tasks
-        require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
+        require('matchdep').filterDev(['grunt-*', '!grunt-cli']).forEach(grunt.loadNpmTasks);
 
         var cfg = {
             // Common paths to be used by tasks
@@ -277,6 +260,10 @@ var path           = require('path'),
             // ### config for grunt-shell
             // command line tools
             shell: {
+                // run bundle
+                bundle: {
+                    command: 'bundle install'
+                },
                 // install bourbon
                 bourbon: {
                     command: 'bourbon install --path <%= paths.adminAssets %>/sass/modules/'
@@ -380,7 +367,7 @@ var path           = require('path'),
                             'core/shared/vendor/jquery/jquery-ui-1.10.3.custom.min.js',
                             'core/client/assets/lib/jquery-utils.js',
                             'core/client/assets/lib/uploader.js',
-                            'core/shared/vendor/underscore.js',
+                            'core/shared/vendor/lodash.underscore.js',
                             'core/shared/vendor/backbone/backbone.js',
                             'core/shared/vendor/handlebars/handlebars-runtime.js',
                             'core/shared/vendor/moment.js',
@@ -395,6 +382,7 @@ var path           = require('path'),
                             'core/client/assets/vendor/codemirror/mode/gfm/gfm.js',
                             'core/client/assets/vendor/showdown/showdown.js',
                             'core/client/assets/vendor/showdown/extensions/ghostdown.js',
+                            'core/shared/vendor/showdown/extensions/typography.js',
                             'core/shared/vendor/showdown/extensions/github.js',
                             'core/client/assets/vendor/shortcuts.js',
                             'core/client/assets/vendor/validator-client.js',
@@ -435,7 +423,7 @@ var path           = require('path'),
                             'core/shared/vendor/jquery/jquery-ui-1.10.3.custom.min.js',
                             'core/client/assets/lib/jquery-utils.js',
                             'core/client/assets/lib/uploader.js',
-                            'core/shared/vendor/underscore.js',
+                            'core/shared/vendor/lodash.underscore.js',
                             'core/shared/vendor/backbone/backbone.js',
                             'core/shared/vendor/handlebars/handlebars-runtime.js',
                             'core/shared/vendor/moment.js',
@@ -450,6 +438,7 @@ var path           = require('path'),
                             'core/client/assets/vendor/codemirror/mode/gfm/gfm.js',
                             'core/client/assets/vendor/showdown/showdown.js',
                             'core/client/assets/vendor/showdown/extensions/ghostdown.js',
+                            'core/shared/vendor/showdown/extensions/typography.js',
                             'core/shared/vendor/showdown/extensions/github.js',
                             'core/client/assets/vendor/shortcuts.js',
                             'core/client/assets/vendor/validator-client.js',
@@ -501,7 +490,7 @@ var path           = require('path'),
 
         grunt.registerTask('loadConfig', function () {
             var done = this.async();
-            config.load().then(function () {
+            bootstrap().then(function () {
                 done();
             });
         });
@@ -847,7 +836,7 @@ var path           = require('path'),
 
         // ### Tools for building assets
 
-        grunt.registerTask('init', 'Prepare the project for development', ['shell:bourbon', 'default']);
+        grunt.registerTask('init', 'Prepare the project for development', ['shell:bundle', 'shell:bourbon', 'default']);
 
         // Before running in production mode
         grunt.registerTask('prod', 'Build CSS, JS & templates for production', ['sass:compress', 'handlebars', 'concat', 'uglify']);
